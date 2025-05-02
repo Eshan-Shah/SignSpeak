@@ -5,71 +5,96 @@ import time
 import os
 
 # === Config ===
-WORDS = ["Hello", "Bye", "Thanks", "Yes", "No"]
+WORDS = {
+    "Hello": "right",
+    "Bye": "right",
+    "Thanks": "right",
+    "Yes": "both",
+    "No": "both"
+}
 SAMPLES_PER_WORD = 30
 DATA_PATH = "data/gestures.csv"
 os.makedirs("data", exist_ok=True)
 
-# === MediaPipe Setup ===
+# === MediaPipe ===
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.5
-)
-
-# === Webcam ===
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2,
+                       min_detection_confidence=0.7, min_tracking_confidence=0.5)
 cap = cv2.VideoCapture(0)
 all_data = []
 
-def draw_text(frame, text, y=30, color=(255, 255, 255)):
-    cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+def countdown_screen(word, hand_usage):
+    for count in [3, 2, 1]:
+        ret, frame = cap.read()
+        frame = cv2.flip(frame, 1)
+        cv2.putText(frame, f"Get ready to sign: {word}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(frame, f"Using {hand_usage} hand(s)", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (200, 200, 200), 2)
+        cv2.putText(frame, f"Capturing in... {count}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        cv2.imshow("SignSpeak - Data Collection", frame)
+        cv2.waitKey(1000)
 
-# === Data Collection Loop ===
-for word in WORDS:
-    print(f"✋ Prepare to sign: {word}")
-    for i in range(SAMPLES_PER_WORD):
-        success, frame = cap.read()
-        if not success:
+for word, hand_usage in WORDS.items():
+    print(f"✋ Prepare to sign: {word} ({hand_usage} hand)")
+    countdown_screen(word, hand_usage)
+    collected = 0
+
+    while collected < SAMPLES_PER_WORD:
+        ret, frame = cap.read()
+        if not ret:
             continue
 
         frame = cv2.flip(frame, 1)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Countdown before capture
-        for countdown in [3, 2, 1]:
-            temp_frame = frame.copy()
-            draw_text(temp_frame, f"Get ready to sign: {word}", 30)
-            draw_text(temp_frame, f"Capturing in... {countdown}", 80, (0, 255, 255))
-            cv2.imshow("SignSpeak - Data Collection", temp_frame)
-            cv2.waitKey(1000)  # wait 1 second
-
-        # Final capture
-        success, frame = cap.read()
-        frame = cv2.flip(frame, 1)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = hands.process(rgb)
 
-        if result.multi_hand_landmarks and len(result.multi_hand_landmarks) == 2:
-            features = []
-            for hand in result.multi_hand_landmarks:
-                for lm in hand.landmark:
-                    features.extend([lm.x, lm.y, lm.z])
-            features.append(word)
-            all_data.append(features)
-            print(f"✅ Captured {i+1}/{SAMPLES_PER_WORD} for '{word}'")
+        display = frame.copy()
+        cv2.putText(display, f"Sign: {word} ({hand_usage})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(display, f"Samples collected: {collected}/{SAMPLES_PER_WORD}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (100, 255, 100), 2)
+
+        if result.multi_hand_landmarks and result.multi_handedness:
+            landmarks = []
+            hands_detected = {
+                result.multi_handedness[i].classification[0].label.lower(): result.multi_hand_landmarks[i]
+                for i in range(len(result.multi_hand_landmarks))
+            }
+
+            if hand_usage == "both":
+                if "left" in hands_detected and "right" in hands_detected:
+                    for label in ["left", "right"]:
+                        for lm in hands_detected[label].landmark:
+                            landmarks.extend([lm.x, lm.y, lm.z])
+                else:
+                    cv2.putText(display, "⚠️ Both hands required", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                    cv2.imshow("SignSpeak - Data Collection", display)
+                    cv2.waitKey(1)
+                    continue
+            else:
+                hand_key = hand_usage if hand_usage in ["left", "right"] else next(iter(hands_detected))
+                if hand_key in hands_detected:
+                    for lm in hands_detected[hand_key].landmark:
+                        landmarks.extend([lm.x, lm.y, lm.z])
+                    landmarks += [0.0] * (21 * 3)  # pad for 2nd hand
+                else:
+                    cv2.putText(display, f"⚠️ {hand_key.title()} hand not detected", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                    cv2.imshow("SignSpeak - Data Collection", display)
+                    cv2.waitKey(1)
+                    continue
+
+            landmarks.append(word)
+            all_data.append(landmarks)
+            collected += 1
+            print(f"✅ Collected {collected}/{SAMPLES_PER_WORD} for '{word}'")
+
         else:
-            print(f"⚠️ Could not detect both hands — skipping frame.")
+            cv2.putText(display, "⚠️ No hands detected", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-        # Short pause between samples
-        time.sleep(0.3)
+        cv2.imshow("SignSpeak - Data Collection", display)
+        cv2.waitKey(1)
 
-# === Cleanup ===
 cap.release()
 cv2.destroyAllWindows()
 
-# === Save Data ===
+# === Save ===
 if all_data:
     num_features = len(all_data[0]) - 1
     columns = [f"f{i}" for i in range(num_features)] + ["label"]
