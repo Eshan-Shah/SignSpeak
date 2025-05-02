@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-SIGN = "Yes"  # Change this to any label in your dataset
+SIGN = "Hello"  # Change this to any label in your dataset
 
 HAND_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 4),

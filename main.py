@@ -22,6 +22,7 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.5
 )
 
+
 # === Webcam Capture ===
 cap = cv2.VideoCapture(0)
 
