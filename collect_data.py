@@ -1,14 +1,16 @@
 import cv2
 import mediapipe as mp
 import pandas as pd
+import time
 import os
 
-# === Settings ===
-OUTPUT_CSV = "data/gestures.csv"
-SIGN_LABEL = "hello"  # <- change this for each new sign
-NUM_SAMPLES = 200     # how many frames to record
+# === Config ===
+WORDS = ["Hello", "Bye", "Thanks", "Yes", "No"]
+SAMPLES_PER_WORD = 30
+DATA_PATH = "data/gestures.csv"
+os.makedirs("data", exist_ok=True)
 
-# === Setup ===
+# === MediaPipe Setup ===
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
     static_image_mode=False,
@@ -16,43 +18,66 @@ hands = mp_hands.Hands(
     min_detection_confidence=0.7,
     min_tracking_confidence=0.5
 )
+
+# === Webcam ===
 cap = cv2.VideoCapture(0)
-sample_count = 0
-data = []
+all_data = []
 
-print(f"✋ Get ready to record sign: {SIGN_LABEL}")
+def draw_text(frame, text, y=30, color=(255, 255, 255)):
+    cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-while cap.isOpened() and sample_count < NUM_SAMPLES:
-    ret, frame = cap.read()
-    if not ret:
-        break
+# === Data Collection Loop ===
+for word in WORDS:
+    print(f"✋ Prepare to sign: {word}")
+    for i in range(SAMPLES_PER_WORD):
+        success, frame = cap.read()
+        if not success:
+            continue
 
-    frame = cv2.flip(frame, 1)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    result = hands.process(rgb)
+        frame = cv2.flip(frame, 1)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    if result.multi_hand_landmarks and len(result.multi_hand_landmarks) == 2:
-        frame_data = []
-        for hand_landmarks in result.multi_hand_landmarks:
-            for lm in hand_landmarks.landmark:
-                frame_data.extend([lm.x, lm.y, lm.z])
-        
-        if len(frame_data) == 126:
-            frame_data.append(SIGN_LABEL)
-            data.append(frame_data)
-            sample_count += 1
-            print(f"Saved sample {sample_count}/{NUM_SAMPLES}")
+        # Countdown before capture
+        for countdown in [3, 2, 1]:
+            temp_frame = frame.copy()
+            draw_text(temp_frame, f"Get ready to sign: {word}", 30)
+            draw_text(temp_frame, f"Capturing in... {countdown}", 80, (0, 255, 255))
+            cv2.imshow("SignSpeak - Data Collection", temp_frame)
+            cv2.waitKey(1000)  # wait 1 second
 
-    # Show preview
-    cv2.imshow("Data Collection - Both Hands", frame)
-    if cv2.waitKey(1) & 0xFF == 27:
-        break
+        # Final capture
+        success, frame = cap.read()
+        frame = cv2.flip(frame, 1)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        result = hands.process(rgb)
 
+        if result.multi_hand_landmarks and len(result.multi_hand_landmarks) == 2:
+            features = []
+            for hand in result.multi_hand_landmarks:
+                for lm in hand.landmark:
+                    features.extend([lm.x, lm.y, lm.z])
+            features.append(word)
+            all_data.append(features)
+            print(f"✅ Captured {i+1}/{SAMPLES_PER_WORD} for '{word}'")
+        else:
+            print(f"⚠️ Could not detect both hands — skipping frame.")
+
+        # Short pause between samples
+        time.sleep(0.3)
+
+# === Cleanup ===
 cap.release()
 cv2.destroyAllWindows()
 
-# === Save to CSV ===
-os.makedirs("data", exist_ok=True)
-df = pd.DataFrame(data)
-df.to_csv(OUTPUT_CSV, mode='a', header=not os.path.exists(OUTPUT_CSV), index=False)
-print(f"✅ Done. {sample_count} samples saved to {OUTPUT_CSV}")
+# === Save Data ===
+if all_data:
+    num_features = len(all_data[0]) - 1
+    columns = [f"f{i}" for i in range(num_features)] + ["label"]
+    df = pd.DataFrame(all_data, columns=columns)
+    if os.path.exists(DATA_PATH):
+        df.to_csv(DATA_PATH, mode='a', header=False, index=False)
+    else:
+        df.to_csv(DATA_PATH, index=False)
+    print(f"📁 Saved {len(all_data)} samples to {DATA_PATH}")
+else:
+    print("⚠️ No data collected.")
