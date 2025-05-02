@@ -8,7 +8,7 @@ interpreter = tf.lite.Interpreter(model_path="model/gestures.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
-labels = np.load("model/labels.npy")
+labels = np.load("model/labels.npy", allow_pickle=True)
 
 # === MediaPipe Init ===
 mp_hands = mp.solutions.hands
@@ -17,7 +17,7 @@ mp_styles = mp.solutions.drawing_styles
 
 hands = mp_hands.Hands(
     static_image_mode=False,
-    max_num_hands=2,
+    max_num_hands=2,    
     min_detection_confidence=0.7,
     min_tracking_confidence=0.5
 )
