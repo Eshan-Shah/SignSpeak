@@ -3,7 +3,7 @@ def visualiseData():
     import matplotlib.pyplot as plt
     import numpy as np
 
-    SIGN = "Thanks"  # Change this to any label in your dataset
+    SIGN = "Hello"  # Change this to any label in your dataset
 
     HAND_CONNECTIONS = [
         (0, 1), (1, 2), (2, 3), (3, 4),
@@ -15,31 +15,32 @@ def visualiseData():
 
     # Load data
     df = pd.read_csv("data/gestures.csv")
-    
-    # Print the columns of the DataFrame to inspect
-    print("Columns in DataFrame:", df.columns)
-
-    # Check if the 'label' column exists
-    if 'label' not in df.columns:
-        print("Error: 'label' column not found in the dataset.")
+    if "label" not in df.columns:
+        print("❌ 'label' column not found.")
         return
-
+    
     samples = df[df['label'] == SIGN].drop('label', axis=1).astype(float)
+    if samples.empty:
+        print(f"⚠️ No samples found for label '{SIGN}'")
+        return
+    
     mean_pose = samples.mean().values
 
     def is_valid_hand(hand_data):
-        return not np.allclose(hand_data, 0)
+        return not np.allclose(hand_data, 0, atol=1e-6)
 
-    def plot_hand(hand_data, color, alpha=1.0, lw=1):
+    def plot_hand(hand_data, color, alpha=1.0, lw=1, label=None):
         x = hand_data[0::3]
         y = hand_data[1::3]
         for i, j in HAND_CONNECTIONS:
             plt.plot([x[i], x[j]], [y[i], y[j]], color=color, linewidth=lw, alpha=alpha)
-        plt.scatter(x, y, c=color, s=30, alpha=alpha)
+        plt.scatter(x, y, c=color, s=30, alpha=alpha, label=label)
 
-    # --- Plot all samples first ---
+    # Plot
     plt.figure(figsize=(7, 7))
-    for i, row in samples.iterrows():
+
+    # Plot all sample poses
+    for _, row in samples.iterrows():
         data = row.values
         hand1 = data[:63]
         hand2 = data[63:126]
@@ -49,21 +50,21 @@ def visualiseData():
         if is_valid_hand(hand2):
             plot_hand(hand2, color='gray', alpha=0.3)
 
-    # --- Overlay the average pose in blue ---
+    # Overlay average poses
     avg_hand1 = mean_pose[:63]
     avg_hand2 = mean_pose[63:126]
 
     if is_valid_hand(avg_hand1):
-        plot_hand(avg_hand1, color='blue', alpha=1.0, lw=2)
+        plot_hand(avg_hand1, color='blue', alpha=1.0, lw=2, label='Avg Hand 1 (blue)')
     if is_valid_hand(avg_hand2):
-        plot_hand(avg_hand2, color='red', alpha=1.0, lw=2)
+        plot_hand(avg_hand2, color='red', alpha=1.0, lw=2, label='Avg Hand 2 (red)')
 
-    # --- Final Touches ---
+    # Final touches
     plt.gca().invert_yaxis()
     plt.axis('equal')
     plt.grid(True)
     plt.title(f"Samples + Average Pose for '{SIGN}'")
-    plt.legend(['Hand 1 avg (blue)', 'Hand 2 avg (red)'], loc='upper right')
+    plt.legend(loc='upper right')
     plt.show()
 
 visualiseData()

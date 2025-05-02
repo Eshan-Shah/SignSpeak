@@ -8,10 +8,8 @@ def collectData():
     # === Config ===
     WORDS = {
         "Hello": "right",
-        "Bye": "right",
         "Thanks": "right",
         "Yes": "both",
-        "No": "both"
     }
     SAMPLES_PER_WORD = 30
     DATA_PATH = "data/gestures.csv"
@@ -96,14 +94,25 @@ def collectData():
     cv2.destroyAllWindows()
 
     # === Save ===
+    # === Save ===
     if all_data:
-        num_features = len(all_data[0]) - 1
-        columns = [f"f{i}" for i in range(num_features)] + ["label"]
+        num_features = len(all_data[0]) - 1  # Assuming the label is the last column
+        columns = [f"f{i}" for i in range(num_features)] + ["label"]  # Proper column names
+
         df = pd.DataFrame(all_data, columns=columns)
+
+        print("Columns in DataFrame:", df.columns)
+
         if os.path.exists(DATA_PATH):
-            df.to_csv(DATA_PATH, mode='a', header=False, index=False)
-        else:
-            df.to_csv(DATA_PATH, index=False)
+            old_df = pd.read_csv(DATA_PATH)
+            df = pd.concat([old_df, df], ignore_index=True)
+
+        df.to_csv(DATA_PATH, index=False, encoding='utf-8')
         print(f"📁 Saved {len(all_data)} samples to {DATA_PATH}")
     else:
         print("⚠️ No data collected.")
+
+
+
+
+collectData()
