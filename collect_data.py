@@ -9,9 +9,20 @@ WORDS = {
     "Hello": "right",
     "Bye": "right",
     "Thanks": "right",
+    "Please": "right",
+    "Sorry": "right",
     "Yes": "both",
-    "No": "both"
+    "No": "both",
+    "I Love You": "right",
+    "Help": "both",
+    "Stop": "right",
+    "More": "both",
+    "Eat": "right",
+    "Drink": "right",
+    "Where": "right",
+    "Who": "right"
 }
+
 SAMPLES_PER_WORD = 30
 DATA_PATH = "data/gestures.csv"
 os.makedirs("data", exist_ok=True)
