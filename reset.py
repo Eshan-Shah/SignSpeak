@@ -23,5 +23,4 @@ def resetModel():
     else:
         print(f"Folder '{folder_path}' not found.")
 
-
-resetModel()
+resetData()
